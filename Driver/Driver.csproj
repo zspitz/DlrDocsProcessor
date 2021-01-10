@@ -7,7 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ZSpitz.Util" Version="0.1.90" />
+    <PackageReference Include="ZSpitz.Util" Version="0.1.92" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Filter\Filter.csproj" />
   </ItemGroup>
 
   <ItemGroup>
