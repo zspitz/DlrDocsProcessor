@@ -32,7 +32,7 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
     Process process = new();
     process.StartInfo = new() {
         FileName = "cmd",
-        Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath}""",
+        Arguments = @$"/C ""{pandocPath} -s {doc} -t json --extract-media=. | {filterPath}""",
         RedirectStandardOutput = true,
         RedirectStandardError = true,
         WorkingDirectory = docRoot
@@ -48,7 +48,7 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
         process = new();
         process.StartInfo = new() {
             FileName = "cmd",
-            Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm --wrap=preserve --extract-media=. -o {id}.md""",
+            Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm --wrap=preserve -o {id}.md""",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             WorkingDirectory = docRoot
