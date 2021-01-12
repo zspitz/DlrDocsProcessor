@@ -17,8 +17,6 @@ var rootPath = GetFullPath($"{GetParent(GetExecutingAssembly().Location)}");
 var sourcePath = Combine(rootPath, "source");
 var outputPath = Combine(rootPath, "output");
 if (Directory.Exists(outputPath)) {
-    //WriteLine("Delete output folder?");
-    //if (ReadKey().Key != ConsoleKey.Y) { return; }
     Directory.Delete(outputPath, true);
 }
 CreateDirectory(outputPath);
@@ -48,7 +46,7 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
         process = new();
         process.StartInfo = new() {
             FileName = "cmd",
-            Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm --wrap=preserve -o {id}.md""",
+            Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm+gfm_auto_identifiers --wrap=preserve -o {id}.md""",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             WorkingDirectory = docRoot

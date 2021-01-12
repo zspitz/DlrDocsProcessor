@@ -10,11 +10,13 @@ using System.IO;
 using System.Diagnostics;
 using System;
 using static ZSpitz.Util.Functions;
+using Endless;
 
 var command = new RootCommand() {
     new Option<int>("--pass", () => -1)
 };
 var result = command.Parse(args);
+// there are multiple passes on each document; enables splitting the document based on its' first-level headers
 var pass = result.ValueForOption<int>("--pass");
 
 var headerCount = 0;
@@ -43,8 +45,8 @@ if (pass == -1) {
 }
 
 var numberingGenerator = new DelegateVisitor();
-// insert hierarchal numbering into headers
 numberingGenerator.Add((Header header) =>
+    // insert hierarchal numbering into headers
     header with
     {
         Text = new Inline[] {
@@ -54,6 +56,7 @@ numberingGenerator.Add((Header header) =>
     }
 );
 
+// excludes parts of the document from the output based on the current pass
 var splitter = new DelegateVisitor();
 splitter.Add((Pandoc pandoc) => 
     pandoc with
@@ -70,8 +73,30 @@ splitter.Add((Pandoc pandoc) =>
     }
 );
 
-
 var visitor = new DelegateVisitor();
+
+// rewrite headers to embedded HTML with explicitly defined ids
+visitor.Add((Pandoc pandoc) => {
+    Debugger.Launch();
+    var ret = pandoc with
+    {
+        Blocks = pandoc.Blocks.Select<Block, Block>(block => {
+            if (block.IsT9) {
+                var header = block.AsT9;
+                var id = header.Attr.Identifier;
+                return new Para(
+                    new Inline[] { new RawInline("markdown", @$"<h{header.Level} id=""{header.Attr.Identifier}"">") }
+                        .Concat(header.Text)
+                        .ConcatOne(new RawInline("markdown", $"</h{header.Level}>"))
+                        .ToImmutableList()
+                );
+            }
+            return block;
+        }).ToImmutableList()
+    };
+
+    return ret;
+});
 
 // remove height and width from images, so they'll output as standard markdown images, instead of HTML img elements
 visitor.Add((Image img) => 
@@ -79,7 +104,7 @@ visitor.Add((Image img) =>
     {
         Attr = img.Attr with
         {
-            KeyValuePairs = img.Attr.KeyValuePairs.WhereT((key, value) => key.NotIn("height", "width")).ToImmutableList()
+            KeyValuePairs = img.Attr.KeyValuePairs.WhereT((key, _) => key.NotIn("height", "width")).ToImmutableList()
         }
     }
 );
@@ -94,6 +119,7 @@ visitor.Add((Inline inline) => {
 
 Filter.Run(numberingGenerator, splitter, visitor);
 
+// generates the next header number
 static class HeaderNumber {
     private static (int, int, int, int) current { get; set; }
     public static string Next(Header header) {

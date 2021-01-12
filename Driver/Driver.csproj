@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ZSpitz.Util" Version="0.1.92" />
+    <PackageReference Include="ZSpitz.Util" Version="0.1.93" />
   </ItemGroup>
 
   <ItemGroup>
