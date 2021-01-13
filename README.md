@@ -3,13 +3,12 @@ Convert [DLR documentation](https://github.com/IronLanguages/dlr/tree/master/Doc
 
 Some background at https://github.com/IronLanguages/dlr/issues/246.
 
-Goals:
+This project carries out the following (everything takes place in the `Filter` project, unless noted otherwise):
 
-* Split each Word document into multiple Markdown files, based on the 1st-level header
-* Replace HTML markup for images with Markdown
+* Identify and mark code blocks in such a way that they can be recognized by Pandoc (`Driver` project)
+* Generate the per-Word-document TOC into `_sidebar.md`
+* Split each Word document into multiple Markdown files, based on the 1st-level header. (This involves multiple passes over the document, each time returning to Pandoc only the relevant section)
+* Document headings are auto-numbered; Pandoc doesn't recreate this numbering in Markdown. Recreate them in the text, but not in the generated IDs. This entails using embedded HTML to explicitly write the IDs
+* Replace HTML markup for images with Markdown, by removing positioning information
 * Replace HTML markup for underlines with Markdown **bold**
-* Document headings are auto-numbered; Pandoc doesn't recreate this numbering in Markdown. Recreate them in the text, but not in the generated IDs.
-* Generate TOC for each document; put into `_sidebar.md`
-  * Each document's TOC will show all the headings for that document + links to the other documents
-  * Alternatively, the other document's headers will be hidden in a details sction, if that works on a wiki
-
+* Reduce bullet list spacing from the Pandoc-generated 3 spaces to 1 space (`Driver` project)
