@@ -7,10 +7,11 @@ using System.CommandLine;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.IO;
-using System.Diagnostics;
 using System;
 using static ZSpitz.Util.Functions;
 using Endless;
+using static System.Linq.Enumerable;
+using System;
 
 var command = new RootCommand() {
     new Option<int>("--pass", () => -1)
@@ -25,40 +26,56 @@ if (pass == -1) {
     var firstPass = new DelegateVisitor();
 
     // generate headers.json
-    var headers = new Dictionary<int, string>();
+    var toplevelHeaders = new Dictionary<int, string>();
+    var tocEntries = new List<(int level, ImmutableList<Inline> text, string url)>();
+
     firstPass.Add((Pandoc pandoc) => {
         foreach (var block in pandoc.Blocks) {
             if (block.TryPickT9(out var header, out var _) && header.Level == 1) {
                 headerCount += 1;
-                headers.Add(headerCount, header.Attr.Identifier);
-            } else if (headerCount == 0 && !headers.ContainsKey(0)) {
-                headers.Add(0, "frontmatter");
+                toplevelHeaders.Add(headerCount, header.Attr.Identifier);
+            } else if (headerCount == 0 && !toplevelHeaders.ContainsKey(0)) {
+                toplevelHeaders.Add(0, "frontmatter");
+                tocEntries.Add(
+                    0,
+                    ((Inline)new Str("Frontmatter")).Yield().ToImmutableList(),
+                    "forntmatter.md"
+                );
+            }
+
+            if (header is { }) {
+                tocEntries.Add(header.Level, header.Text, $"{toplevelHeaders[headerCount]}.md#{header.Attr.Identifier}");
             }
         }
-        return pandoc;
-    });
-    Filter.Run(firstPass);
 
-    var jsonString = JsonSerializer.Serialize(headers);
+        // generate the TOC for the sidebar
+        return pandoc with
+        {
+            Blocks = ((Block)new LineBlock(
+                tocEntries.SelectT((level, text, url) => {
+                    var repetitions = (level == 0 ? 0 : level - 1) * 2;
+                    var inlines = new List<Inline>();
+                    Repeat<Inline>(new RawInline("markdown", "&nbsp;"), repetitions).AddRangeTo(inlines);
+                    inlines.Add(new Link(
+                        Attr.Empty,
+                        text,
+                        (url, "")
+                    ));
+                    return inlines.ToImmutableList();
+                }).ToImmutableList()
+            )).Yield().ToImmutableList()
+        };
+    });
+    Filter.Run(new HierarchyNumberGenerator(), firstPass);
+
+    var jsonString = JsonSerializer.Serialize(toplevelHeaders);
     File.WriteAllText("headers.json", jsonString);
     return;
 }
 
-var numberingGenerator = new DelegateVisitor();
-numberingGenerator.Add((Header header) =>
-    // insert hierarchal numbering into headers
-    header with
-    {
-        Text = new Inline[] {
-                new Str(HeaderNumber.Next(header)),
-                new Space()
-        }.Concat(header.Text).ToImmutableList()
-    }
-);
-
 // excludes parts of the document from the output based on the current pass
 var splitter = new DelegateVisitor();
-splitter.Add((Pandoc pandoc) => 
+splitter.Add((Pandoc pandoc) =>
     pandoc with
     {
         Blocks = pandoc.Blocks.Select(block => {
@@ -76,9 +93,8 @@ splitter.Add((Pandoc pandoc) =>
 var visitor = new DelegateVisitor();
 
 // rewrite headers to embedded HTML with explicitly defined ids
-visitor.Add((Pandoc pandoc) => {
-    Debugger.Launch();
-    var ret = pandoc with
+visitor.Add((Pandoc pandoc) =>
+    pandoc with
     {
         Blocks = pandoc.Blocks.Select<Block, Block>(block => {
             if (block.IsT9) {
@@ -93,13 +109,10 @@ visitor.Add((Pandoc pandoc) => {
             }
             return block;
         }).ToImmutableList()
-    };
-
-    return ret;
-});
+    });
 
 // remove height and width from images, so they'll output as standard markdown images, instead of HTML img elements
-visitor.Add((Image img) => 
+visitor.Add((Image img) =>
     img with
     {
         Attr = img.Attr with
@@ -117,28 +130,29 @@ visitor.Add((Inline inline) => {
     return inline;
 });
 
-Filter.Run(numberingGenerator, splitter, visitor);
+Filter.Run(new HierarchyNumberGenerator(), splitter, visitor);
 
-// generates the next header number
-static class HeaderNumber {
-    private static (int, int, int, int) current { get; set; }
-    public static string Next(Header header) {
-        switch (header.Level) {
-            case 1:
-                current = (current.Item1 + 1, 0, 0, 0);
-                break;
-            case 2:
-                current = (current.Item1, current.Item2 + 1, 0, 0);
-                break;
-            case 3:
-                current = (current.Item1, current.Item2, current.Item3 + 1, 0);
-                break;
-            case 4:
-                current = (current.Item1, current.Item2, current.Item3, current.Item4 + 1);
-                break;
-            default:
-                throw new NotImplementedException();
-        }
-        return TupleValues(current).Cast<int>().Where(x => x>0).Joined(".");
+public class HierarchyNumberGenerator : VisitorBase {
+    private (int, int, int, int) current { get; set; }
+    private string Next(Header header) {
+        current = header.Level switch {
+            1 => (current.Item1 + 1, 0, 0, 0),
+            2 => (current.Item1, current.Item2 + 1, 0, 0),
+            3 => (current.Item1, current.Item2, current.Item3 + 1, 0),
+            4 => (current.Item1, current.Item2, current.Item3, current.Item4 + 1),
+            _ => throw new NotImplementedException(),
+        };
+        return TupleValues(current).Cast<int>().Where(x => x > 0).Joined(".");
+    }
+
+    public override Header VisitHeader(Header header) {
+        header = header with
+        {
+            Text = new Inline[] {
+                    new Str(Next(header)),
+                    new Space()
+            }.Concat(header.Text).ToImmutableList()
+        };
+        return base.VisitHeader(header);
     }
 }
