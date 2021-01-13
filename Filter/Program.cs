@@ -44,7 +44,9 @@ if (pass == -1) {
             }
 
             if (header is { }) {
-                tocEntries.Add(header.Level, header.Text, $"{toplevelHeaders[headerCount]}.md#{header.Attr.Identifier}");
+                var url = $"{toplevelHeaders[headerCount]}.md";
+                if (header.Level != 1) { url += $"#{header.Attr.Identifier}"; }
+                tocEntries.Add(header.Level, header.Text, url);
             }
         }
 
@@ -97,8 +99,7 @@ visitor.Add((Pandoc pandoc) =>
     pandoc with
     {
         Blocks = pandoc.Blocks.Select<Block, Block>(block => {
-            if (block.IsT9) {
-                var header = block.AsT9;
+            if (block.TryPickT9(out var header, out var _) && header.Level != 1) {
                 var id = header.Attr.Identifier;
                 return new Para(
                     new Inline[] { new RawInline("markdown", @$"<h{header.Level} id=""{header.Attr.Identifier}"">") }
