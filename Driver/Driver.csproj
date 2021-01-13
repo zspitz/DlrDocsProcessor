@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Kurukuru" Version="1.2.0" />
     <PackageReference Include="ZSpitz.Util" Version="0.1.93" />
   </ItemGroup>
 
