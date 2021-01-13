@@ -47,9 +47,10 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
         if (!result.StdErr.IsNullOrWhitespace()) { WriteLine(result.StdErr); }
     });
 
-    var json = File.ReadAllText(Combine(docRoot, "headers.json"));
+    var headersPath = Combine(docRoot, "headers.json");
+    var json = File.ReadAllText(headersPath);
     JsonSerializer.Deserialize<Dictionary<int, string>>(json)!.ForEachKVP((pass, id) => {
-        Spinner.Start($"Starting pass: {pass}, id: {id}", () => {
+        Spinner.Start($"Pass: {pass}, id: {id}", () => {
             Process process = new();
             process.StartInfo = new() {
                 FileName = "cmd",
@@ -63,9 +64,22 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
             var result = RunProcess(process);
             if (!result.StdOut.IsNullOrWhitespace()) { WriteLine(result.StdOut); }
             if (!result.StdErr.IsNullOrWhitespace()) { WriteLine(result.StdErr); }
+
+            // Pandoc emits bullet lists with 3 spaces after the bullet
+            // reduce to one space
+            var currentHeadingPath = Combine(docRoot, $"{id}.md");
+            var lines = File.ReadLines(currentHeadingPath).Select(line => {
+                if (line.StartsWith("-   ")) {
+                    line = $"- {line.Substring(4)}";
+                }
+                return line;
+            }).ToList();
+            File.WriteAllLines(
+                currentHeadingPath,
+                lines
+            );
         });
     });
 
-    // while testing, we want to break early
-    break;
+    File.Delete(headersPath);
 }
