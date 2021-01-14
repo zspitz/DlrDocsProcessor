@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Filter\Filter.csproj" />
+    <ProjectReference Include="..\WordProcessing\WordProcessing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

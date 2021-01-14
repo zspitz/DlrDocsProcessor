@@ -27,18 +27,14 @@ var filterPath = Combine(rootPath, "Filter.exe");
 foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
     WriteLine($"Beginning {doc}");
 
-    var name = GetFileNameWithoutExtension(doc).ToLower();
-    var docRoot = Combine(outputPath, name);
-    if (!Directory.Exists(docRoot)) { CreateDirectory(docRoot); }
-
-    Spinner.Start($"First pass; sidebar generation", () => {
+    Spinner.Start($"Word processing", () => {
         Process process = new();
         process.StartInfo = new() {
-            FileName = "cmd",
-            Arguments = @$"/C ""{pandocPath} -s {doc} -t gfm --extract-media=. -F {filterPath} --wrap=preserve -o _sidebar.md""",
+            FileName = "WordProcessing.exe",
+            Arguments = $@"""{doc}""",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            WorkingDirectory = docRoot
+            WorkingDirectory = rootPath
         };
         process.EnableRaisingEvents = true;
 
@@ -47,30 +43,26 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
         if (!result.StdErr.IsNullOrWhitespace()) { WriteLine(result.StdErr); }
     });
 
+    var name = GetFileNameWithoutExtension(doc).ToLower();
+    var docRoot = Combine(outputPath, name);
+    if (!Directory.Exists(docRoot)) { CreateDirectory(docRoot); }
+
+    Spinner.Start($"First pass; sidebar generation", () => {
+        RunCmd(docRoot, $"{pandocPath} -s {doc} -t gfm --extract-media=. -F {filterPath} --wrap=preserve -o _sidebar.md");
+    });
+
     var headersPath = Combine(docRoot, "headers.json");
     var json = File.ReadAllText(headersPath);
     JsonSerializer.Deserialize<Dictionary<int, string>>(json)!.ForEachKVP((pass, id) => {
         Spinner.Start($"Pass: {pass}, id: {id}", () => {
-            Process process = new();
-            process.StartInfo = new() {
-                FileName = "cmd",
-                Arguments = @$"/C ""{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm+gfm_auto_identifiers --wrap=preserve -o {id}.md""",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                WorkingDirectory = docRoot
-            };
-            process.EnableRaisingEvents = true;
-
-            var result = RunProcess(process);
-            if (!result.StdOut.IsNullOrWhitespace()) { WriteLine(result.StdOut); }
-            if (!result.StdErr.IsNullOrWhitespace()) { WriteLine(result.StdErr); }
+            RunCmd(docRoot, $"{pandocPath} -s {doc} -t json | {filterPath} --pass={pass} | {pandocPath} -s -f json -t gfm+gfm_auto_identifiers --wrap=preserve -o {id}.md");
 
             // Pandoc emits bullet lists with 3 spaces after the bullet
             // reduce to one space
             var currentHeadingPath = Combine(docRoot, $"{id}.md");
             var lines = File.ReadLines(currentHeadingPath).Select(line => {
                 if (line.StartsWith("-   ")) {
-                    line = $"- {line.Substring(4)}";
+                    line = $"- {line[4..]}";
                 }
                 return line;
             }).ToList();
@@ -82,4 +74,23 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
     });
 
     File.Delete(headersPath);
+
+    // while testing, stop after the first iteration
+    break;
+}
+
+static void RunCmd(string workingDirectory, string arguments) {
+    Process process = new();
+    process.StartInfo = new() {
+        FileName = "cmd",
+        Arguments = @$"/C ""{arguments}""",
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        WorkingDirectory = workingDirectory
+    };
+    process.EnableRaisingEvents = true;
+
+    var result = RunProcess(process);
+    if (!result.StdOut.IsNullOrWhitespace()) { WriteLine(result.StdOut); }
+    if (!result.StdErr.IsNullOrWhitespace()) { WriteLine(result.StdErr); }
 }
