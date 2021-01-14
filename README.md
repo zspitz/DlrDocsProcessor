@@ -11,4 +11,5 @@ This project carries out the following (everything takes place in the `Filter` p
 * Document headings are auto-numbered; Pandoc doesn't recreate this numbering in Markdown. Recreate them in the text, but not in the generated IDs. This entails using embedded HTML to explicitly write the IDs
 * Replace HTML markup for images with Markdown, by removing positioning information
 * Replace HTML markup for underlines with Markdown **bold**
+* Trim excess spaces from beginning of lines in code blocks
 * Reduce bullet list spacing from the Pandoc-generated 3 spaces to 1 space (`Driver` project)
