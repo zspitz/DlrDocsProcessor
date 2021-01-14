@@ -9,7 +9,6 @@ using System.Text.Json;
 using System.IO;
 using System;
 using static ZSpitz.Util.Functions;
-using Endless;
 using static System.Linq.Enumerable;
 
 var command = new RootCommand() {
@@ -19,9 +18,20 @@ var result = command.Parse(args);
 // there are multiple passes on each document; enables splitting the document based on its' first-level headers
 var pass = result.ValueForOption<int>("--pass");
 
+var titles = new List<(string, string)>() {
+    { "dlr-overview", "Dynamic Language Runtime" },
+    { "dlr-spec-hosting", "DLR Hostirng Spec" },
+    { "expr-tree-spec", "Expression Trees v2 Spec"},
+    { "library-authors-introduction", "Getting Started with the DLR as a Library Author"},
+    { "sites-binders-dynobj-interop", "Sites, Binders, and Dynamic Object Interop Spec"},
+    { "sympl", "SymPL Implementation on the Dynamic Language Runtime"}
+};
+
 var headerCount = 0;
 
 if (pass == -1) {
+    var docname = Path.GetFileNameWithoutExtension(Directory.GetCurrentDirectory());
+
     // this is the initial pass; we do here two things: 
     // 1. determine the number and ids of the first-level headers in the document
     // 2. generate the sidebar toc
@@ -40,7 +50,7 @@ if (pass == -1) {
                 toplevelHeaders.Add(0, "frontmatter");
                 tocEntries.Add(
                     0,
-                    ((Inline)new Str("Frontmatter")).Yield().ToImmutableList(),
+                    ((Inline)new Str("Frontmatter")).YieldList(),
                     "frontmatter.md"
                 );
             }
@@ -55,19 +65,45 @@ if (pass == -1) {
         // output the parts of the sidebar toc to Pandoc
         return pandoc with
         {
-            Blocks = ((Block)new LineBlock(
-                tocEntries.SelectT((level, text, url) => {
-                    var repetitions = (level == 0 ? 0 : level - 1) * 2;
-                    var inlines = new List<Inline>();
-                    Repeat<Inline>(new RawInline("markdown", "&nbsp;"), repetitions).AddRangeTo(inlines);
-                    inlines.Add(new Link(
-                        Attr.Empty,
-                        text,
-                        (url, "")
-                    ));
-                    return inlines.ToImmutableList();
-                }).ToImmutableList()
-            )).Yield().ToImmutableList()
+            Blocks = ImmutableList.Create<Block>(
+                // per-document title
+                new Header(3, Attr.Empty, ImmutableList.Create<Inline>(new Str(titles.First(x => x.Item1 == docname).Item2))),
+
+                // hierarchal toc
+                new LineBlock(
+                    tocEntries.SelectT((level, text, url) => {
+                        var repetitions = (level == 0 ? 0 : level - 1) * 2;
+                        var inlines = new List<Inline>();
+                        Repeat<Inline>(new RawInline("markdown", "&nbsp;"), repetitions).AddRangeTo(inlines);
+                        inlines.Add(new Link(
+                            Attr.Empty,
+                            text,
+                            (url, "")
+                        ));
+                        return inlines.ToImmutableList();
+                    }).ToImmutableList()
+                ),
+                
+                new HorizontalRule(),
+
+                // links to other documents
+                new Para(((Inline)new Str("Other documents:")).YieldList()),
+                new LineBlock(
+                    titles
+                        .WhereT((name, _) => name != docname)
+                        .SelectT((name, title) => new Inline[] {
+                            new Link(
+                                Attr.Empty,
+                                ((Inline)new Str(title)).YieldList(),
+                                ($"{name}.md", title)
+                            ),
+                            new LineBreak()
+                        })
+                        .SelectMany()
+                        .ToImmutableList()
+                        .YieldList()
+                )
+            )
         };
     });
 
@@ -136,6 +172,7 @@ visitor.Add((Inline inline) => {
 });
 
 // trim excess spaces from start of code lines
+// also, set language as first classname
 visitor.Add((CodeBlock codeBlock) => {
     var lines = codeBlock.Code.Split('\n');
     var minSpaces = lines.Select(line => {
@@ -147,7 +184,7 @@ visitor.Add((CodeBlock codeBlock) => {
         Code = codeBlock.Code.Split('\n').Joined("\n", line => line[minSpaces..]),
         Attr = Attr.Empty with
         {
-            Classes = "csharp".Yield().ToImmutableList()
+            Classes = "csharp".YieldList()
         }
     };
 });
@@ -177,4 +214,8 @@ public class HierarchyNumberGenerator : VisitorBase {
         };
         return base.VisitHeader(header);
     }
+}
+
+public static class Extensions {
+    public static ImmutableList<T> YieldList<T>(this T element) => Endless.Generate.Yield(element).ToImmutableList();
 }

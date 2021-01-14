@@ -1,5 +1,4 @@
-﻿using System;
-using static System.IO.Path;
+﻿using static System.IO.Path;
 using static System.IO.Directory;
 using static System.Reflection.Assembly;
 using System.IO;
@@ -74,9 +73,6 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
     });
 
     File.Delete(headersPath);
-
-    // while testing, stop after the first iteration
-    break;
 }
 
 static void RunCmd(string workingDirectory, string arguments) {
