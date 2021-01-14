@@ -11,7 +11,6 @@ using System;
 using static ZSpitz.Util.Functions;
 using Endless;
 using static System.Linq.Enumerable;
-using System;
 
 var command = new RootCommand() {
     new Option<int>("--pass", () => -1)
@@ -39,7 +38,7 @@ if (pass == -1) {
                 tocEntries.Add(
                     0,
                     ((Inline)new Str("Frontmatter")).Yield().ToImmutableList(),
-                    "forntmatter.md"
+                    "frontmatter.md"
                 );
             }
 
@@ -131,11 +130,24 @@ visitor.Add((Inline inline) => {
     return inline;
 });
 
+// trim excess spaces from start of code lines
+visitor.Add((CodeBlock codeBlock) => {
+    var lines = codeBlock.Code.Split('\n');
+    var minSpaces = lines.Select(line => {
+        var trimmed = line.TrimStart();
+        return line.Length - trimmed.Length;
+    }).Min();
+    return codeBlock with
+    {
+        Code = codeBlock.Code.Split('\n').Joined("\n", line => line[minSpaces..])
+    };
+});
+
 Filter.Run(new HierarchyNumberGenerator(), splitter, visitor);
 
 public class HierarchyNumberGenerator : VisitorBase {
     private (int, int, int, int) current { get; set; }
-    private string Next(Header header) {
+    private string next(Header header) {
         current = header.Level switch {
             1 => (current.Item1 + 1, 0, 0, 0),
             2 => (current.Item1, current.Item2 + 1, 0, 0),
@@ -150,7 +162,7 @@ public class HierarchyNumberGenerator : VisitorBase {
         header = header with
         {
             Text = new Inline[] {
-                    new Str(Next(header)),
+                    new Str(next(header)),
                     new Space()
             }.Concat(header.Text).ToImmutableList()
         };
