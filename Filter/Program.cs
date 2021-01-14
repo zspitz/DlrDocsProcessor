@@ -22,6 +22,9 @@ var pass = result.ValueForOption<int>("--pass");
 var headerCount = 0;
 
 if (pass == -1) {
+    // this is the initial pass; we do here two things: 
+    // 1. determine the number and ids of the first-level headers in the document
+    // 2. generate the sidebar toc
     var firstPass = new DelegateVisitor();
 
     // generate headers.json
@@ -49,7 +52,7 @@ if (pass == -1) {
             }
         }
 
-        // generate the TOC for the sidebar
+        // output the parts of the sidebar toc to Pandoc
         return pandoc with
         {
             Blocks = ((Block)new LineBlock(
@@ -67,6 +70,8 @@ if (pass == -1) {
             )).Yield().ToImmutableList()
         };
     });
+
+    // we need to insert the hierarchal numbering before the first pass, so it'll be part of the sidebar toc
     Filter.Run(new HierarchyNumberGenerator(), firstPass);
 
     var jsonString = JsonSerializer.Serialize(toplevelHeaders);
@@ -139,7 +144,11 @@ visitor.Add((CodeBlock codeBlock) => {
     }).Min();
     return codeBlock with
     {
-        Code = codeBlock.Code.Split('\n').Joined("\n", line => line[minSpaces..])
+        Code = codeBlock.Code.Split('\n').Joined("\n", line => line[minSpaces..]),
+        Attr = Attr.Empty with
+        {
+            Classes = "csharp".Yield().ToImmutableList()
+        }
     };
 });
 
