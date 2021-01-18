@@ -138,7 +138,7 @@ var visitor = new DelegateVisitor();
 visitor.Add((Pandoc pandoc) =>
     pandoc with
     {
-        Blocks = pandoc.Blocks.Select<Block, Block>(block => {
+        Blocks = pandoc.Blocks.Select(block => {
             if (block.TryPickT9(out var header, out var _) && header.Level != 1) {
                 var id = header.Attr.Identifier;
                 return new Para(
