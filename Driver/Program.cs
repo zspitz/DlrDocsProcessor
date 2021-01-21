@@ -47,7 +47,7 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
     if (!Directory.Exists(docRoot)) { CreateDirectory(docRoot); }
 
     Spinner.Start($"First pass; sidebar generation", () => {
-        RunCmd(docRoot, $"{pandocPath} -s {doc} -t gfm --extract-media=. -F {filterPath} --wrap=preserve -o _sidebar.md");
+        RunCmd(docRoot, $"{pandocPath} -s {doc} -t gfm --extract-media=. -F {filterPath} --wrap=preserve -o index.md");
     });
 
     var headersPath = Combine(docRoot, "headers.json");
@@ -74,6 +74,36 @@ foreach (var doc in EnumerateFiles(sourcePath).Where(x => !x.Contains("~$"))) {
 
     File.Delete(headersPath);
 }
+
+// copy SVG files from source to corresponding location of EMF
+// delete EMF
+var correspondingSvg =
+    Directory.EnumerateFiles(outputPath!, "*.emf", new EnumerationOptions {
+        MatchCasing = MatchCasing.CaseInsensitive,
+        RecurseSubdirectories = true
+    })
+    .Select(emfPath => (
+        emfPath,
+        svgPath: ChangeExtension(emfPath.Replace(outputPath, sourcePath), ".svg")
+    ));
+
+var missingSvg =
+    correspondingSvg
+       .WhereT((_, svgPath) => !File.Exists(svgPath))
+       .ToList();
+
+if (missingSvg.Any()) {
+    WriteLine("The following .emf files need to be converted to svg. Press any key to conitnue.");
+    WriteLine(missingSvg.JoinedT("\n\n", (emfPath, svgPath) => $"{emfPath}\n{svgPath}"));
+    return;
+}
+
+correspondingSvg.ForEachT((emfPath, svgSourcePath) => {
+    var targetSvgPath = ChangeExtension(emfPath, ".svg");
+    File.Copy(svgSourcePath, targetSvgPath, true);
+    File.Delete(emfPath);
+});
+
 
 static void RunCmd(string workingDirectory, string arguments) {
     Process process = new();

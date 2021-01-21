@@ -10,6 +10,8 @@ using System.IO;
 using System;
 using static ZSpitz.Util.Functions;
 using static System.Linq.Enumerable;
+using System.Diagnostics;
+using static System.IO.Path;
 
 var command = new RootCommand() {
     new Option<int>("--pass", () => -1)
@@ -34,7 +36,7 @@ if (pass == -1) {
 
     // this is the initial pass; we do here two things: 
     // 1. determine the number and ids of the first-level headers in the document
-    // 2. generate the sidebar toc
+    // 2. generate index.md
     var firstPass = new DelegateVisitor();
 
     // generate headers.json
@@ -67,7 +69,7 @@ if (pass == -1) {
         {
             Blocks = ImmutableList.Create<Block>(
                 // per-document title
-                new Header(3, Attr.Empty, ImmutableList.Create<Inline>(new Str(titles.First(x => x.Item1 == docname).Item2))),
+                new Header(1, Attr.Empty, ImmutableList.Create<Inline>(new Str(titles.First(x => x.Item1 == docname).Item2))),
 
                 // hierarchal toc
                 new LineBlock(
@@ -95,7 +97,7 @@ if (pass == -1) {
                             new Link(
                                 Attr.Empty,
                                 ((Inline)new Str(title)).YieldList(),
-                                ($"{name}.md", title)
+                                ($"../{name}", title)
                             ),
                             new LineBreak()
                         })
@@ -153,15 +155,27 @@ visitor.Add((Pandoc pandoc) =>
     });
 
 // remove height and width from images, so they'll output as standard markdown images, instead of HTML img elements
-visitor.Add((Image img) =>
+visitor.Add((Image img) => 
     img with
     {
         Attr = img.Attr with
         {
             KeyValuePairs = img.Attr.KeyValuePairs.WhereT((key, _) => key.NotIn("height", "width")).ToImmutableList()
         }
-    }
-);
+    });
+
+// replace links to .emf files with links to .svg in the same place
+visitor.Add((Image img) => {
+    var url = img.Target.Url;
+    url =
+        url.EndsWith(".emf", StringComparison.OrdinalIgnoreCase) ?
+            ChangeExtension(url, ".svg") :
+            url;
+    return img with
+    {
+        Target = (url, img.Target.Title)
+    };
+});
 
 // replace underline with emphasis for markdown bold
 visitor.Add((Inline inline) => {
